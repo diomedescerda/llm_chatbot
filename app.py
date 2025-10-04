@@ -1,6 +1,7 @@
 from openai import OpenAI
 import os
 from dotenv import load_dotenv
+import gradio as gr
 
 load_dotenv()
 gemini_key = os.environ.get("GEMINI_API_KEY")
@@ -8,6 +9,9 @@ open_router_key = os.environ.get("OPENROUTER_API_KEY")
 
 open_router = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=open_router_key)
 gemini = OpenAI(base_url="https://generativelanguage.googleapis.com/v1beta/openai/", api_key=gemini_key)
+
+ollama = OpenAI(base_url='http://localhost:11434/v1', api_key='ollama')
+model_name = "gpt-oss:20b"
 
 def chat(message, history, provider, model, task):
     try:
@@ -48,6 +52,9 @@ def chat(message, history, provider, model, task):
         elif provider == "Google":
             client = gemini
             model_name = f"models/{model}"  # Add models/ prefix for Gemini
+        elif provider == "Ollama":
+            client = ollama
+            model_name = model
         else:
             raise ValueError(f"Unsupported provider: {provider}")
 
@@ -61,12 +68,12 @@ def chat(message, history, provider, model, task):
         return f"Error: {e}"
 
 if __name__ == "__main__":
-    import gradio as gr
 
-    PROVIDERS = ["OpenRouter", "Google"]
+    PROVIDERS = ["OpenRouter", "Google", "Ollama"]
     MODELS = {
         "OpenRouter": ["deepseek/deepseek-chat-v3.1:free"],
         "Google": ["gemini-2.5-flash-lite"],
+        "Ollama": ["gpt-oss:20b"],
     }
     TASKS = ["Traducción", "Resumen"]
 
