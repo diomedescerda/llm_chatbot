@@ -23,6 +23,7 @@ python app.py
 ## Configuración
 
 Asegúrate de tener las keys en variables de entorno llamadas `GEMINI_API_KEY` y `OPENROUTER_API_KEY`.
+Además de esto, el modelo especifico de Ollama que se usa, en este caso por defecto es `gpt-oss:20b`.
 
 ## Estructura
 - `app.py`: Código principal del chatbot.
