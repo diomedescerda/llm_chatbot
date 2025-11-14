@@ -5,7 +5,7 @@ import gradio as gr
 import mlflow
 import time
 
-mlflow.set_tracking_uri("http://127.0.0.1:5000")
+mlflow.set_tracking_uri("http://mlflow-server:5000")
 mlflow.set_experiment("translation_app") 
 
 load_dotenv()
@@ -100,4 +100,5 @@ if __name__ == "__main__":
             type="messages"
         )
 
-    demo.launch()
+    print("-------")
+    demo.launch(server_name="0.0.0.0", server_port=7860)
