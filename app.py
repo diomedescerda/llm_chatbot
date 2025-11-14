@@ -15,7 +15,7 @@ open_router_key = os.environ.get("OPENROUTER_API_KEY")
 open_router = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=open_router_key)
 gemini = OpenAI(base_url="https://generativelanguage.googleapis.com/v1beta/openai/", api_key=gemini_key)
 
-def chat(message, provider, model, target_language):
+def chat(message, history, provider, model, target_language):
     start_time =  time.time()
 
     prompt = (
@@ -60,7 +60,7 @@ def chat(message, provider, model, target_language):
 
 
 if __name__ == "__main__":
-    PROVIDERS = ["OpenRouter", "Google"]
+    PROVIDERS = ["Google", "OpenRouter"]
     MODELS = {
         "OpenRouter": ["deepseek/deepseek-chat-v3.1:free"],
         "Google": ["gemini-2.5-flash-lite"],
@@ -75,9 +75,8 @@ if __name__ == "__main__":
     def update_models(provider):
         return gr.Dropdown(choices=MODELS[provider], value=MODELS[provider][0])
 
-    def chat_with_config(messages, provider, model, target_language, *args):
-        user_message = messages
-        return chat(user_message, provider, model, target_language)
+    def chat_with_config(message, history, provider, model, target_language):
+        return chat(message, history, provider, model, target_language)
 
 
     with gr.Blocks() as demo:
