@@ -43,7 +43,15 @@ docker run -d \
 
 ---
 
-## 🌐 3. Start the Translation App
+## 🧱 3. Build the app
+
+```bash
+docker build -t translation_app .
+```
+
+---
+
+## 🌐 4. Start the Translation App
 
 ```bash
 docker run -d \
