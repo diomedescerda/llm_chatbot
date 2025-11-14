@@ -1,30 +1,74 @@
-# llm_chatbot
+# 🚀 Translation App + MLflow (Docker)
 
-Este proyecto es un chatbot basado en acceso por medio de keys a LLMs (Large Language Model) usando la libreria de OpenAI.
+This project runs two containers:
 
-## Instalación
+1. **MLflow Tracking Server**
+2. **Translation App** (Gradio + MLflow logging)
 
-1. Clona el repositorio:
-   ```
-   git clone https://github.com/diomedescerda/llm_chatbot.git
-   ```
-2. Instala las dependencias:
-   ```
-   pip install -r requirements.txt
-   ```
+Both containers communicate through a shared Docker network called **`mlflow-net`**.
 
-## Uso
+---
 
-Ejecuta la aplicación:
-```
-python app.py
+## 🧱 1. Create the Docker Network
+
+```bash
+docker network create mlflow-net
 ```
 
-## Configuración
+---
 
-Asegúrate de tener las keys en variables de entorno llamadas `GEMINI_API_KEY` y `OPENROUTER_API_KEY`.
-Además de esto, el modelo especifico de Ollama que se usa, en este caso por defecto es `gpt-oss:20b`.
+## 📦 2. Start MLflow Server
 
-## Estructura
-- `app.py`: Código principal del chatbot.
-- `requirements.txt`: Dependencias del proyecto.
+```bash
+docker run -d \
+  --name mlflow-server \
+  --network mlflow-net \
+  -p 5000:5000 \
+  -v mlflow-data:/mlflow \
+  ghcr.io/mlflow/mlflow:latest \
+  mlflow server \
+    --host 0.0.0.0 \
+    --port 5000 \
+    --backend-store-uri sqlite:///mlflow.db \
+    --default-artifact-root /mlflow \
+    --allowed-hosts="*"
+```
+
+### ✔ What this does
+
+* Hosts MLflow at **[http://localhost:5000](http://localhost:5000)**
+* Stores experiments in a SQLite file (`mlflow.db`)
+* Saves artifacts in a persistent Docker volume (`mlflow-data`)
+* Allows connections from any host *inside the Docker network* (`--allowed-hosts="*"`)
+
+---
+
+## 🌐 3. Start the Translation App
+
+```bash
+docker run -d \
+  --name translator \
+  --network mlflow-net \
+  -p 7860:7860 \
+  translation_app:latest
+```
+
+### ✔ What this does
+
+* Runs your translation app on **[http://localhost:7860](http://localhost:7860)**
+* Connects to MLflow via the shared network (`mlflow-net`)
+
+Your `app.py` should contain:
+
+```python
+mlflow.set_tracking_uri("http://mlflow-server:5000")
+```
+
+---
+
+## ✅ Access the Tools
+
+| Service            | URL                                            |
+| ------------------ | ---------------------------------------------- |
+| MLflow UI          | [http://localhost:5000](http://localhost:5000) |
+| Translation App UI | [http://localhost:7860](http://localhost:7860) |
