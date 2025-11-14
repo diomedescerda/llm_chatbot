@@ -2,6 +2,11 @@ from openai import OpenAI
 import os
 from dotenv import load_dotenv
 import gradio as gr
+import mlflow
+import time
+
+mlflow.set_tracking_uri("http://127.0.0.1:5000")
+mlflow.set_experiment("translation_app") 
 
 load_dotenv()
 gemini_key = os.environ.get("GEMINI_API_KEY")
@@ -10,93 +15,90 @@ open_router_key = os.environ.get("OPENROUTER_API_KEY")
 open_router = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=open_router_key)
 gemini = OpenAI(base_url="https://generativelanguage.googleapis.com/v1beta/openai/", api_key=gemini_key)
 
-ollama = OpenAI(base_url='http://localhost:11434/v1', api_key='ollama')
-model_name = "gpt-oss:20b"
+def chat(message, provider, model, target_language):
+    start_time =  time.time()
 
-def chat(message, history, provider, model, task):
-    try:
-        system_messages = []
-        if task == "Traducción":
-            system_messages.append({
-                "role": "system",
-                "content": "Eres un traductor, debes traducir todo al idioma Español.",
-            })
-        elif task == "Resumen":
-            system_messages.append({
-                "role": "system",
-                "content": "Eres un asistente que realiza resumenes de textos.",
-            })
-        else:
-            system_messages.extend([
-                {
-                    "role": "system",
-                    "content": "Eres un traductor, debes traducir todo al idioma Español.",
-                },
-                {
-                    "role": "system",
-                    "content": "Eres un asistente que realiza resumenes de textos.",
-                }
-            ])
+    prompt = (
+        f"Traduce el siguiente texto al idioma {target_language}. "
+        "Devuelve solo la traducción, sin explicaciones.\n\n"
+        f"Texto:\n{message}\n\nTraducción:"
+    )
 
-        for msg in history:
-            if msg["role"] == "user":
-                system_messages.append({"role": "user", "content": msg["content"]})
-            elif msg["role"] == "assistant":
-                system_messages.append({"role": "assistant", "content": msg["content"]})
+    if provider == "OpenRouter":
+        client = open_router
+        model_name = model
+    elif provider == "Google":
+        client = gemini
+        model_name = f"models/{model}"
+    else:
+        raise ValueError(f"Unsupported provider: {provider}")
 
-        system_messages.append({"role": "user", "content": message})
+    resp = client.chat.completions.create(
+        model=model_name,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    translated = resp.choices[0].message.content
+    
+    # Metrics
+    latency = time.time() - start_time
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
 
-        if provider == "OpenRouter":
-            client = open_router
-            model_name = model  # Use the full model name for OpenRouter
-        elif provider == "Google":
-            client = gemini
-            model_name = f"models/{model}"  # Add models/ prefix for Gemini
-        elif provider == "Ollama":
-            client = ollama
-            model_name = model
-        else:
-            raise ValueError(f"Unsupported provider: {provider}")
+    with mlflow.start_run(run_name=f"{provider}_{model}_{target_language}"):
+        mlflow.log_param("provider", provider)
+        mlflow.log_param("model", model_name)
+        mlflow.log_param("target_language", target_language)
+        mlflow.log_param("timestamp", timestamp)
 
-        resp = client.chat.completions.create(
-            model=model_name,
-            messages=system_messages,
-        )
-        return resp.choices[0].message.content
-    except Exception as e:
-        print(f"Error: {e}")
-        return f"Error: {e}"
+        mlflow.log_metric("latency_seconds", latency)
+        mlflow.log_metric("original_length", len(message))
+        mlflow.log_metric("translation_length", len(translated))
+
+        mlflow.log_text(message, "original_text.txt")
+        mlflow.log_text(translated, "translated_text.txt")
+
+    return translated
+
 
 if __name__ == "__main__":
-
-    PROVIDERS = ["OpenRouter", "Google", "Ollama"]
+    PROVIDERS = ["OpenRouter", "Google"]
     MODELS = {
         "OpenRouter": ["deepseek/deepseek-chat-v3.1:free"],
         "Google": ["gemini-2.5-flash-lite"],
-        "Ollama": ["gpt-oss:20b"],
     }
-    TASKS = ["Traducción", "Resumen"]
+    LANGUAGES = [
+        "English", "Mandarin Chinese", "Hindi", "Spanish", "French",
+        "Modern Standard Arabic", "Bengali", "Portuguese", "Russian",
+        "Urdu", "Indonesian", "German", "Japanese", "Swahili",
+        "Turkish", "Tamil", "Vietnamese", "Italian", "Korean"
+    ]
 
     def update_models(provider):
         return gr.Dropdown(choices=MODELS[provider], value=MODELS[provider][0])
 
-    def chat_with_config(message, history, provider, model, task):
-        return chat(message, history, provider, model, task)
+    def chat_with_config(messages, provider, model, target_language, *args):
+        user_message = messages
+        return chat(user_message, provider, model, target_language)
+
 
     with gr.Blocks() as demo:
-        gr.Markdown("## LLMs Chatbot")
-            
+        gr.Markdown("# 🌍 AI Translator\nTraduce texto usando OpenRouter o Gemini.")
+
         with gr.Row():
             provider = gr.Dropdown(PROVIDERS, label="Provider", value=PROVIDERS[0])
             model = gr.Dropdown(MODELS[PROVIDERS[0]], label="Model", value=MODELS[PROVIDERS[0]][0])
-            task = gr.Dropdown(TASKS, label="Task", value=TASKS[0])
-        
+            target = gr.Dropdown(
+                choices=LANGUAGES,
+                label="Idioma objetivo",
+                value="Spanish",
+                allow_custom_value=True
+            )
+
         provider.change(update_models, provider, model)
-        
+
         chatbot = gr.ChatInterface(
             fn=chat_with_config,
-            additional_inputs=[provider, model, task],
+            additional_inputs=[provider, model, target],
             type="messages"
         )
-    
+
     demo.launch()
