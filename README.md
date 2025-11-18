@@ -1,80 +1,56 @@
-# 🚀 Translation App + MLflow (Docker)
+# 🚀 Translation App + MLflow (Docker Compose + Docker Swarm)
 
-This project runs two containers:
-
+This project provides a fully containerized setup for:
 1. **MLflow Tracking Server**
 2. **Translation App** (Gradio + MLflow logging)
 
-Both containers communicate through a shared Docker network called **`mlflow-net`**.
+You can run it in two modes:
+- **MLflow Tracking Server**
+- **Translation App** (Gradio + MLflow logging)
 
 ---
+⚠️ **Important:**
+Before running the app by any method, ensure you provide your API key (for the model provider) in one of the following ways:
 
-## 🧱 1. Create the Docker Network
+- As an environment variable:
+```bash
+export API_KEY="your_key_here"
+```
+---
+
+## 🐳 1. Run with Docker Compose (LOCAL)
+Docker Compose builds locally and is ideal for development.
 
 ```bash
-docker network create mlflow-net
+docker compose up --build -d
 ```
 
+This will:
+- **Build the app-traductor image**
+- **Start MLflow server**
+- **Start the translation app**
+- **Create the Docker network automatically**
 ---
 
-## 📦 2. Start MLflow Server
+## 🐳 2. Deploy with Docker Swarm (PRODUCTION)
 
+1. **Initialize Swarm (only once)**
 ```bash
-docker run -d \
-  --name mlflow-server \
-  --network mlflow-net \
-  -p 5000:5000 \
-  -v mlflow-data:/mlflow \
-  ghcr.io/mlflow/mlflow:latest \
-  mlflow server \
-    --host 0.0.0.0 \
-    --port 5000 \
-    --backend-store-uri sqlite:///mlflow.db \
-    --default-artifact-root /mlflow \
-    --allowed-hosts="*"
+docker swarm init
 ```
 
-### ✔ What this does
-
-* Hosts MLflow at **[http://localhost:5000](http://localhost:5000)**
-* Stores experiments in a SQLite file (`mlflow.db`)
-* Saves artifacts in a persistent Docker volume (`mlflow-data`)
-* Allows connections from any host *inside the Docker network* (`--allowed-hosts="*"`)
-
----
-
-## 🧱 3. Build the app
-
+2. **Deploy the stack**
 ```bash
-docker build -t translation_app .
+docker stack deploy -c docker-stack.yml traductor-stack
 ```
 
----
-
-## 🌐 4. Start the Translation App
-
+3. **Check running services**
 ```bash
-docker run -d \
-  --name translator \
-  --network mlflow-net \
-  -p 7860:7860 \
-  translation_app:latest
+docker stack services traductor-stack
 ```
-
-### ✔ What this does
-
-* Runs your translation app on **[http://localhost:7860](http://localhost:7860)**
-* Connects to MLflow via the shared network (`mlflow-net`)
-
-Your `app.py` should contain:
-
-```python
-mlflow.set_tracking_uri("http://mlflow-server:5000")
-```
-
 ---
 
-## ✅ Access the Tools
+## ✅ Access the Apps
 
 | Service            | URL                                            |
 | ------------------ | ---------------------------------------------- |
