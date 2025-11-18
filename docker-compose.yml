@@ -1,0 +1,36 @@
+services:
+  mlflow-server:
+    image: ghcr.io/mlflow/mlflow:latest
+    container_name: mlflow-server
+    networks:
+      - mlflow-net
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow-data:/mlflow
+    command: >
+      mlflow server
+        --host 0.0.0.0
+        --port 5000
+        --backend-store-uri sqlite:///mlflow.db
+        --default-artifact-root /mlflow
+        --allowed-hosts="*"
+
+  app-traductor:
+    build: .
+    container_name: translator
+    networks:
+      - mlflow-net
+    ports:
+      - "7860:7860"
+    environment:
+      API_KEY: ${API_KEY}
+      MLFLOW_TRACKING_URI: "http://mlflow-server:5000"
+    depends_on:
+      - mlflow-server
+
+networks:
+  mlflow-net:
+
+volumes:
+  mlflow-data:
