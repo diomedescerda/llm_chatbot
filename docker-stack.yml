@@ -1,0 +1,49 @@
+services:
+  mlflow-server:
+    image: ghcr.io/mlflow/mlflow:latest
+    networks:
+      - mlflow-net
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow-data:/mlflow
+    command: >
+      mlflow server
+        --host 0.0.0.0
+        --port 5000
+        --backend-store-uri sqlite:////mlflow/mlflow.db
+        --default-artifact-root /mlflow
+        --allowed-hosts="*"
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+
+  app-traductor:
+    image: kenma23/translation_app:latest
+    networks:
+      - mlflow-net
+    ports:
+      - "7860:7860"
+    environment:
+      API_KEY: ${API_KEY}
+      MLFLOW_TRACKING_URI: "http://mlflow-server:5000"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      update_config:
+        parallelism: 1
+        delay: 5s
+
+networks:
+  mlflow-net:
+    driver: overlay
+
+volumes:
+  mlflow-data:
+  mlflow-db:
+  mlflow-artifacts:
